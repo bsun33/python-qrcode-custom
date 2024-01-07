@@ -82,6 +82,46 @@ class QRColorMask:
         if not normed:
             return None
         return sum(normed) / len(normed)
+    
+class QRColorMask_Customized(QRColorMask):
+    def apply_mask_common(self, image, x, y):
+        norm = self.extrap_color(
+            self.back_color, self.paint_color, image.getpixel((x, y))
+        )
+        if norm is not None:
+            image.putpixel(
+                (x, y),
+                self.interp_color(
+                    self.get_bg_pixel(image, x, y),
+                    self.get_fg_pixel(image, x, y),
+                    norm,
+                ),
+            )
+        else:
+            image.putpixel((x, y), self.get_bg_pixel(image, x, y))
+
+    def apply_mask(self, image):
+        width, height = image.size
+
+        for x in range(0, int(width/2)): # starts with red
+            for y in range(0, int(height/2)):
+                self.apply_mask_common(image, x, y)
+
+        self.front_color=(0,0,255) # blue
+        for x in range(int(width/2), width):
+            for y in range(0, int(height/2)):
+                self.apply_mask_common(image, x, y)
+
+        self.front_color=(0,128,0) # green
+        for x in range(0, int(width/2)):
+            for y in range(int(height/2), height):
+                self.apply_mask_common(image, x, y)
+
+        self.front_color=(215,215,0) # yellow
+        for x in range(int(width/2), width):
+            for y in range(int(height/2), height):
+                self.apply_mask_common(image, x, y)
+
 
 
 class SolidFillColorMask(QRColorMask):
@@ -107,6 +147,22 @@ class SolidFillColorMask(QRColorMask):
             # would be a lot faster. (In fact doing this would probably remove
             # the need for the B&W optimization above.)
             QRColorMask.apply_mask(self, image)
+
+    def get_fg_pixel(self, image, x, y):
+        return self.front_color
+    
+class SolidFillColorMask_Customized(QRColorMask_Customized):
+    """
+    Just fills in the background with one color and the foreground with another
+    """
+
+    def __init__(self, back_color=(255, 255, 255), front_color=(255, 0, 0)):
+        self.back_color = back_color
+        self.front_color = front_color
+        self.has_transparency = len(self.back_color) == 4
+
+    def apply_mask(self, image):
+        QRColorMask_Customized.apply_mask(self, image)
 
     def get_fg_pixel(self, image, x, y):
         return self.front_color
